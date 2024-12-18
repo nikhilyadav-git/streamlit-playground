@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import pydeck as pdk
 import random
+import sys
 
 # Load sample data
 def load_data():
@@ -32,9 +33,19 @@ def load_data():
     
     return pd.DataFrame(data)
 
-# Add slight random variation to coordinates
-def add_variation(lat, lon, variation=0.01):
-    return lat + random.uniform(-variation, variation), lon + random.uniform(-variation, variation)
+# Function to generate a random RGBA color
+def random_color():
+    return [random.randint(0, 255) for _ in range(3)] + [random.randint(100, 255)]  # RGB + Alpha (opacity)
+
+# Function to add slight random variation to the coordinates
+def add_variation(lat, lon, max_variation=0.01):
+    """
+    Adds a small random variation to the latitude and longitude.
+    This is to prevent all the markers from stacking on the same point.
+    """
+    lat_variation = random.uniform(-max_variation, max_variation)
+    lon_variation = random.uniform(-max_variation, max_variation)
+    return lat + lat_variation, lon + lon_variation
 
 # Function to create map visualization with filtered data
 def create_map(filtered_data):
@@ -49,30 +60,8 @@ def create_map(filtered_data):
     filtered_data['boarding_station_name_latitude'] = filtered_data['boarding_station_name_latitude'].astype(float)
     filtered_data['boarding_station_name_longitude'] = filtered_data['boarding_station_name_longitude'].astype(float)
     
-    # Create a color mapping for different trains
-    color_map = {
-        9010: [255, 0, 0, 160],
-        9020: [0, 255, 0, 160],
-        9030: [0, 0, 255, 160],
-        9040: [255, 255, 0, 160],
-        9050: [255, 0, 255, 160],
-        9060: [0, 255, 255, 160],
-        9070: [128, 0, 0, 160],
-        9080: [0, 128, 0, 160],
-        9090: [0, 0, 128, 160],
-        9100: [128, 128, 0, 160],
-        9110: [128, 0, 128, 160],
-        9120: [0, 128, 128, 160],
-        9130: [192, 192, 192, 160],
-        9140: [128, 128, 128, 160],
-        9150: [64, 64, 64, 160],
-        9160: [255, 165, 0, 160],
-        9170: [255, 20, 147, 160],
-        9180: [75, 0, 130, 160]
-    }
-    
-    # Assign colors to each train
-    filtered_data['color'] = filtered_data['train_number'].map(color_map)
+    # Assign random colors to each train
+    filtered_data['color'] = [random_color() for _ in range(len(filtered_data))]
     
     # Convert filtered_data to list of dictionaries for pydeck
     data_for_deck = filtered_data.to_dict(orient='records')
