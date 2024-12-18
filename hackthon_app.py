@@ -1,8 +1,85 @@
-import streamlit as st
 from datetime import date
+import streamlit as st
+import pandas as pd
+import pydeck as pdk
+import random
+
+# Load sample data
+# Load sample data
+def load_data():
+    df = pd.read_csv('data/train_pax.csv')
+    #df['departure_date'] = pd.to_datetime(df['departure_date'], format='%Y-%m-%d')
+    df['departure_time'] = pd.to_datetime(df['departure_time'], format='%Y-%m-%d %H:%M:%S').dt.time
+    df['departure_time'] = df['departure_time'].apply(lambda x: x.strftime('%H:%M:%S'))
+    return df
+
+# Function to generate a random RGBA color
+def random_color():
+    return [random.randint(0, 255) for _ in range(3)] + [random.randint(100, 255)]  # RGB + Alpha (opacity)
+
+# Function to add slight random variation to the coordinates
+def add_variation(lat, lon, max_variation=0.01):
+    """
+    Adds a small random variation to the latitude and longitude.
+    This is to prevent all the markers from stacking on the same point.
+    """
+    lat_variation = random.uniform(-max_variation, max_variation)
+    lon_variation = random.uniform(-max_variation, max_variation)
+    return lat + lat_variation, lon + lon_variation
+
+# Function to create map visualization with filtered data
+def create_map(filtered_data):
+    st.write("Map showing departure locations of trains:")
+    
+    # Add slight random variation to the coordinates to prevent overlap
+    filtered_data['boarding_station_name_latitude'], filtered_data['boarding_station_name_longitude'] = zip(
+        *filtered_data.apply(lambda row: add_variation(row['boarding_station_name_latitude'], row['boarding_station_name_longitude']), axis=1)
+    )
+    
+    # Ensure that latitude and longitude are float types
+    filtered_data['boarding_station_name_latitude'] = filtered_data['boarding_station_name_latitude'].astype(float)
+    filtered_data['boarding_station_name_longitude'] = filtered_data['boarding_station_name_longitude'].astype(float)
+    
+    # Assign random colors to each train
+    filtered_data['color'] = [random_color() for _ in range(len(filtered_data))]
+    
+    # Convert filtered_data to list of dictionaries for pydeck
+    data_for_deck = filtered_data.to_dict(orient='records')
+    
+    # Add data to PyDeck
+    view_state = pdk.ViewState(latitude=51.5304, longitude=-0.1260, zoom=5, pitch=50)
+    
+    # Scatterplot layer with dots for each train
+    layer = pdk.Layer(
+        "ScatterplotLayer",
+        data_for_deck,
+        get_position=["boarding_station_name_longitude", "boarding_station_name_latitude"],
+        get_radius=500,  # Size of the dots
+        get_color="color",  # Use the color column for dot colors
+        pickable=True,
+        auto_highlight=True
+    )
+    
+    # Tooltip to show train number, departure time, and passenger counts
+    r = pdk.Deck(
+        layers=[layer],
+        initial_view_state=view_state,
+        tooltip={
+            "html": "<b>Train Number:</b> {train_number}<br><b>Departure Time:</b> {departure_time}<br><b>EU Pax:</b> {pax_EU_count}<br><b>Non-EU Pax:</b> {pax_non_EU_count}<br><b>Adult Pax:</b> {adult_pax_count}<br><b>Senior Pax:</b> {senior_pax_count}<br><b>Youth Pax:</b> {youth_pax_count}<br><b>Infant Pax:</b> {infant_pax_count}",
+            "style": {
+                "backgroundColor": "white",
+                "color": "black",
+                "border": "1px solid #ccc",
+                "padding": "10px"
+            }
+        }
+    )
+    
+    st.pydeck_chart(r)
+
 
 # Set the page title and layout
-st.set_page_config(page_title="Travel UI", layout="wide")
+st.set_page_config(page_title="Station App UI", layout="wide")
 
 # Custom CSS to style the app
 st.markdown("""
@@ -112,10 +189,46 @@ st.markdown("""
 st.markdown("<div class='header'>Heckathon Station App - 2025</div>", unsafe_allow_html=True)
 
 # Tabs using Streamlit Sidebar
-tab = st.sidebar.radio("Choose a Service", ["Trains", "Trains + Hotels", "Hotels"])
+tab = st.sidebar.radio("Choose a Service", ["Passenger", "Trains", "Hotels"])
 
 # Tab content handling
-if tab == "Trains":
+if tab == "Passenger":
+    st.markdown("<div class='subheader'>Passenger</div>", unsafe_allow_html=True)
+
+    # Add extra space
+    st.markdown('<div class="extra-space"></div>', unsafe_allow_html=True)
+    
+    # Train search form
+    with st.container():
+        travel_date = st.date_input("Select Travel Date", min_value=date.today(), key="date")
+
+        st.title("Train Data Visualization")
+
+        # Load data
+        df = load_data()
+
+        # Range slider for selecting time range (5 AM to 10 PM)
+        start_hour, end_hour = st.slider(
+            "Select departure time range",
+            min_value=5,  # No leading zero
+            max_value=22,
+            value=(5, 22),  # No leading zero
+            step=1,
+        )
+
+        # Filter data based on selected time range
+        filtered_data = df[(df['departure_time'].apply(lambda x: int(x.split(':')[0])) >= start_hour) & 
+                        (df['departure_time'].apply(lambda x: int(x.split(':')[0])) <= end_hour)]
+        
+        st.write(filtered_data)
+
+        # Create the map with the filtered data
+        create_map(filtered_data)
+        
+        # Search Button
+        st.markdown("<div class='button-container'>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+elif tab == "Trains":
     st.markdown("<div class='subheader'>Trains</div>", unsafe_allow_html=True)
     st.markdown("""
         <div class='tab-content'>
@@ -145,39 +258,6 @@ if tab == "Trains":
         if st.button("Search Trains", key="train_button", use_container_width=True):
             st.write(f"Searching trains from {departure_station} to {arrival_station} on {travel_date}...")
         st.markdown("</div>", unsafe_allow_html=True)
-
-elif tab == "Trains + Hotels":
-    st.markdown("<div class='subheader'>Trains + Hotels</div>", unsafe_allow_html=True)
-    st.markdown("""
-        <div class='tab-content'>
-            <h3 class='intro-title'>Book Your Train and Hotel</h3>
-            <p class='intro-text'>Book a combined package for your train journey and hotel stay at your destination. Choose a departure station, arrival station, and preferred hotel options.</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # Add extra space
-    st.markdown('<div class="extra-space"></div>', unsafe_allow_html=True)
-    
-
-    # Train and hotel search form
-    with st.container():
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            departure_station = st.selectbox("Select Departure Station", ["London", "Paris", "Brussels", "Amsterdam", "Lille"], key="departure")
-        
-        with col2:
-            arrival_station = st.selectbox("Select Arrival Station", ["London", "Paris", "Brussels", "Amsterdam", "Lille"], key="arrival")
-
-        travel_date = st.date_input("Select Travel Date", min_value=date.today(), key="date")
-        hotel = st.selectbox("Select Hotel", ["Hotel A", "Hotel B", "Hotel C", "Hotel D", "Hotel E"], key="hotel")
-        
-        # Search Button
-        st.markdown("<div class='button-container'>", unsafe_allow_html=True)
-        if st.button("Search Trains + Hotels", key="train_hotel_button", use_container_width=True):
-            st.write(f"Searching for trains from {departure_station} to {arrival_station} on {travel_date} and hotels like {hotel}...")
-        st.markdown("</div>", unsafe_allow_html=True)
-
 else:
     st.markdown("<div class='subheader'>Hotels</div>", unsafe_allow_html=True)
     st.markdown("""

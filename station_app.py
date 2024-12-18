@@ -122,6 +122,8 @@ def main():
 
     # Convert departure_time to datetime for easier filtering
     df["departure_time"] = pd.to_datetime(df["departure_time"], format='%H:%M')
+    # Convert departure_time back to HH:MM:SS format (to only show time)
+    df["departure_time"] = df["departure_time"].dt.strftime('%H:%M:%S')
 
     # Range slider for selecting time range (5 AM to 10 PM)
     start_hour, end_hour = st.slider(
@@ -133,7 +135,10 @@ def main():
     )
 
     # Filter data based on selected time range
-    filtered_data = df[(df['departure_time'].dt.hour >= start_hour) & (df['departure_time'].dt.hour <= end_hour)]
+    filtered_data = df[(df['departure_time'].apply(lambda x: int(x.split(':')[0])) >= start_hour) & 
+                       (df['departure_time'].apply(lambda x: int(x.split(':')[0])) <= end_hour)]
+    
+    st.write(filtered_data)
 
     # Create the map with the filtered data
     create_map(filtered_data)
