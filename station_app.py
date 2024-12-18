@@ -32,6 +32,20 @@ def load_data():
     
     return pd.DataFrame(data)
 
+# Function to swap boarding and arrival stations randomly
+def swap_station_data(df, swap_count=5):
+    """Swap boarding and arrival stations for a random selection of rows."""
+    # Randomly select indices to swap
+    indices_to_swap = random.sample(range(len(df)), swap_count)
+    
+    for i in indices_to_swap:
+        # Swap the boarding and arrival stations and their latitudes and longitudes
+        df.at[i, 'boarding_station_name'], df.at[i, 'arrival_station_name'] = df.at[i, 'arrival_station_name'], df.at[i, 'boarding_station_name']
+        df.at[i, 'boarding_station_name_latitude'], df.at[i, 'arrival_station_name_latitude'] = df.at[i, 'arrival_station_name_latitude'], df.at[i, 'boarding_station_name_latitude']
+        df.at[i, 'boarding_station_name_longitude'], df.at[i, 'arrival_station_name_longitude'] = df.at[i, 'arrival_station_name_longitude'], df.at[i, 'boarding_station_name_longitude']
+    
+    return df
+
 # Function to generate a random RGBA color
 def random_color():
     return [random.randint(0, 255) for _ in range(3)] + [random.randint(100, 255)]  # RGB + Alpha (opacity)
@@ -103,11 +117,11 @@ def main():
     # Load data
     df = load_data()
 
+    # Swap boarding and arrival station data for random rows
+    df = swap_station_data(df, swap_count=5)
+
     # Convert departure_time to datetime for easier filtering
     df["departure_time"] = pd.to_datetime(df["departure_time"], format='%H:%M')
-
-    # Convert departure_time back to HH:MM:SS format (to only show time)
-    df["departure_time"] = df["departure_time"].dt.strftime('%H:%M:%S')
 
     # Range slider for selecting time range (5 AM to 10 PM)
     start_hour, end_hour = st.slider(
@@ -119,10 +133,7 @@ def main():
     )
 
     # Filter data based on selected time range
-    filtered_data = df[(df['departure_time'].apply(lambda x: int(x.split(':')[0])) >= start_hour) & 
-                       (df['departure_time'].apply(lambda x: int(x.split(':')[0])) <= end_hour)]
-    
-    st.write(filtered_data)
+    filtered_data = df[(df['departure_time'].dt.hour >= start_hour) & (df['departure_time'].dt.hour <= end_hour)]
 
     # Create the map with the filtered data
     create_map(filtered_data)
