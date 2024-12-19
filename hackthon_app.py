@@ -1,5 +1,6 @@
 from datetime import date
 import streamlit as st
+import matplotlib.pyplot as plt
 import pandas as pd
 import pydeck as pdk
 import random
@@ -9,8 +10,6 @@ import random
 def load_data():
     df = pd.read_csv('data/train_pax.csv')
     #df['departure_date'] = pd.to_datetime(df['departure_date'], format='%Y-%m-%d')
-    df['departure_time'] = pd.to_datetime(df['departure_time'], format='%Y-%m-%d %H:%M:%S').dt.time
-    df['departure_time'] = df['departure_time'].apply(lambda x: x.strftime('%H:%M:%S'))
     return df
 
 # Function to generate a random RGBA color
@@ -198,6 +197,90 @@ if tab == "Passenger":
     # Add extra space
     st.markdown('<div class="extra-space"></div>', unsafe_allow_html=True)
     
+    # Pax search form
+    with st.container():
+        travel_date = st.date_input("Select Travel Date", min_value=date.today(), key="date")
+
+        st.title("Passenger Data Visualization")
+
+        # Load data
+        df = load_data()
+        df['departure_hr'] = pd.to_datetime(df['departure_time'], format='%Y-%m-%d %H:%M:%S').dt.hour
+        df['departure_time'] = pd.to_datetime(df['departure_time'], format='%Y-%m-%d %H:%M:%S').dt.time
+        df = df.drop(columns=['departure_date','train_number','boarding_station_name_latitude','boarding_station_name_longitude',
+                              'arrival_station_name','arrival_station_name_latitude','arrival_station_name_longitude'])
+
+        # Range slider for selecting time range (5 AM to 10 PM)
+        start_hour, end_hour = st.slider(
+            "Select departure time range",
+            min_value=5,  # No leading zero
+            max_value=22,
+            value=(5, 22),  # No leading zero
+            step=1,
+        )
+
+        # Filter data based on selected time range
+        filtered_data = df[(df['departure_hr'] >= start_hour) & (df['departure_hr'] < end_hour)]
+        
+        st.write(filtered_data)
+
+        # Group by hour for aggregation
+        filtered_data['hour'] = df['departure_hr']
+
+        # Aggregating data by hour (sum of counts)
+        agg_data = filtered_data.groupby('hour').agg({
+            'pax_EU_count': 'sum',
+            'pax_non_EU_count': 'sum',
+            'adult_pax_count': 'sum',
+            'senior_pax_count': 'sum',
+            'youth_pax_count': 'sum',
+            'infant_pax_count': 'sum',
+            'pax_veg_meal_count': 'sum',
+            'pax_non_veg_meal_count': 'sum',
+            'pax_diabetic_meal_count': 'sum',
+            'pax_vegan_meal_count': 'sum',
+            'assistance_required_count': 'sum'
+        }).reset_index()
+
+        # Streamlit layout
+        st.title("Passenger Count and Meal Data by Hour of Departure")
+
+        # Create the plot
+        fig, ax = plt.subplots(figsize=(12, 8))
+
+        # Plotting multiple lines
+        ax.plot(agg_data['hour'], agg_data['pax_EU_count'], label='EU Pax Count', marker='o')
+        ax.plot(agg_data['hour'], agg_data['pax_non_EU_count'], label='Non-EU Pax Count', marker='x')
+        ax.plot(agg_data['hour'], agg_data['adult_pax_count'], label='Adult Pax Count', marker='^')
+        ax.plot(agg_data['hour'], agg_data['senior_pax_count'], label='Senior Pax Count', marker='s')
+        ax.plot(agg_data['hour'], agg_data['youth_pax_count'], label='Youth Pax Count', marker='d')
+        ax.plot(agg_data['hour'], agg_data['infant_pax_count'], label='Infant Pax Count', marker='p')
+        ax.plot(agg_data['hour'], agg_data['pax_veg_meal_count'], label='Veg Meal Count', marker='h')
+        ax.plot(agg_data['hour'], agg_data['pax_non_veg_meal_count'], label='Non-Veg Meal Count', marker='*')
+        ax.plot(agg_data['hour'], agg_data['pax_diabetic_meal_count'], label='Diabetic Meal Count', marker='v')
+        ax.plot(agg_data['hour'], agg_data['pax_vegan_meal_count'], label='Vegan Meal Count', marker='1')
+        ax.plot(agg_data['hour'], agg_data['assistance_required_count'], label='Assistance Count', marker='2')
+
+        # Labels and title
+        ax.set_title('Passenger Count and Meal Data by Hour of Departure Time')
+        ax.set_xlabel('Hour of Departure')
+        ax.set_ylabel('Count')
+        ax.set_xticks(agg_data['hour'])
+        ax.grid(True)
+        ax.legend(loc='upper left')
+
+        # Show the plot
+        st.pyplot(fig)
+        
+        # Search Button
+        st.markdown("<div class='button-container'>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+elif tab == "Trains":
+    st.markdown("<div class='subheader'>Passenger</div>", unsafe_allow_html=True)
+
+    # Add extra space
+    st.markdown('<div class="extra-space"></div>', unsafe_allow_html=True)
+    
     # Train search form
     with st.container():
         travel_date = st.date_input("Select Travel Date", min_value=date.today(), key="date")
@@ -206,6 +289,8 @@ if tab == "Passenger":
 
         # Load data
         df = load_data()
+        df['departure_time'] = pd.to_datetime(df['departure_time'], format='%Y-%m-%d %H:%M:%S').dt.time
+        df['departure_time'] = df['departure_time'].apply(lambda x: x.strftime('%H:%M:%S'))
 
         # Range slider for selecting time range (5 AM to 10 PM)
         start_hour, end_hour = st.slider(
@@ -227,36 +312,6 @@ if tab == "Passenger":
         
         # Search Button
         st.markdown("<div class='button-container'>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-elif tab == "Trains":
-    st.markdown("<div class='subheader'>Trains</div>", unsafe_allow_html=True)
-    st.markdown("""
-        <div class='tab-content'>
-            <h3 class='intro-title'>Find Your Train</h3>
-            <p class='intro-text'>Book your train tickets to various destinations. Simply enter your departure and arrival details, select your preferred train, and confirm your booking.</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # Add extra space
-    st.markdown('<div class="extra-space"></div>', unsafe_allow_html=True)
-    
-
-    # Train search form
-    with st.container():
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            departure_station = st.selectbox("Select Departure Station", ["London", "Paris", "Brussels", "Amsterdam", "Lille"], key="departure")
-        
-        with col2:
-            arrival_station = st.selectbox("Select Arrival Station", ["London", "Paris", "Brussels", "Amsterdam", "Lille"], key="arrival")
-
-        travel_date = st.date_input("Select Travel Date", min_value=date.today(), key="date")
-        
-        # Search Button
-        st.markdown("<div class='button-container'>", unsafe_allow_html=True)
-        if st.button("Search Trains", key="train_button", use_container_width=True):
-            st.write(f"Searching trains from {departure_station} to {arrival_station} on {travel_date}...")
         st.markdown("</div>", unsafe_allow_html=True)
 else:
     st.markdown("<div class='subheader'>Hotels</div>", unsafe_allow_html=True)
