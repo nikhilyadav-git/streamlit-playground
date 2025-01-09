@@ -12,7 +12,7 @@ import plotly.express as px
 
 # Load sample data
 def load_train_data():
-    df = pd.read_csv('data/train.csv')
+    df = pd.read_csv('data/data.csv')
     return df
 
 # Helper functions
